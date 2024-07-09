@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np 
+import numpy as np
 import six
 import collections
 import copy
@@ -15,21 +15,22 @@ SKIP_TYPES = six.string_types
 
 
 class SimpleDataset(Dataset):
-    '''
-    Assuming X and y are numpy arrays and 
-     with X.shape = (n_samples, n_features) 
+    """
+    Assuming X and y are numpy arrays and
+     with X.shape = (n_samples, n_features)
           y.shape = (n_samples,)
-    '''
+    """
+
     def __init__(self, X, y=None):
         self.X = X
         self.y = y
-    
+
     def __len__(self):
-        return (len(self.X))
+        return len(self.X)
 
     def __getitem__(self, i):
         data = self.X[i]
-        #data = np.array(data).astype(np.float32)
+        # data = np.array(data).astype(np.float32)
         if self.y is not None:
             return dict(input=data, label=self.y[i])
         else:
@@ -43,6 +44,7 @@ class FastTensorDataLoader:
     the dataset and calls cat (slow).
     Source: https://discuss.pytorch.org/t/dataloader-much-slower-than-manual-batching/27014/6
     """
+
     def __init__(self, *tensors, tensor_names, batch_size=32, shuffle=False):
         """
         Initialize a FastTensorDataLoader.
@@ -79,46 +81,58 @@ class FastTensorDataLoader:
             raise StopIteration
         batch = {}
         for k in range(len(self.tensor_names)):
-            batch.update({self.tensor_names[k]: self.tensors[k][self.i:self.i+self.batch_size]})
+            batch.update(
+                {
+                    self.tensor_names[k]: self.tensors[k][
+                        self.i : self.i + self.batch_size
+                    ]
+                }
+            )
         self.i += self.batch_size
         return batch
-        
 
     def __len__(self):
         return self.n_batches
 
 
-'''standardize_dataset function is from utils_jared.py'''
+"""standardize_dataset function is from utils_jared.py"""
+
+
 def standardize_dataset(dataset, offset, scale):
     norm_ds = copy.deepcopy(dataset)
-    norm_ds['x'] = (norm_ds['x'] - offset) / scale
+    norm_ds["x"] = (norm_ds["x"] - offset) / scale
     return norm_ds
 
 
-'''load_datasets function is from utils_jared.py'''
+"""load_datasets function is from utils_jared.py"""
+
+
 def load_datasets(dataset_file):
     datasets = defaultdict(dict)
-    with h5py.File(dataset_file, 'r') as fp:
+    with h5py.File(dataset_file, "r") as fp:
         for ds in fp:
             for array in fp[ds]:
                 datasets[ds][array] = fp[ds][array][:]
 
     return datasets
+
 
 def load_cox_gaussian_data():
-    dataset_file = os.path.join(os.path.dirname(__file__), 
-        'datasets/gaussian_survival_data.h5')
+    dataset_file = os.path.join(
+        os.path.dirname(__file__), "datasets/gaussian_survival_data.h5"
+    )
     datasets = defaultdict(dict)
-    with h5py.File(dataset_file, 'r') as fp:
+    with h5py.File(dataset_file, "r") as fp:
         for ds in fp:
             for array in fp[ds]:
                 datasets[ds][array] = fp[ds][array][:]
 
     return datasets
+
 
 def prepare_data(x, label):
     if isinstance(label, dict):
-       e, t = label['e'], label['t']
+        e, t = label["e"], label["t"]
 
     # Sort training data for accurate partial likelihood calculation.
     sort_idx = np.argsort(t)[::-1]
@@ -126,15 +140,16 @@ def prepare_data(x, label):
     e = e[sort_idx]
     t = t[sort_idx]
 
-    #return x, {'e': e, 't': t} this is for parse_data(x, label); see the third line in the parse_data function. 
-    #return {'x': x, 'e': e, 't': t}
+    # return x, {'e': e, 't': t} this is for parse_data(x, label); see the third line in the parse_data function.
+    # return {'x': x, 'e': e, 't': t}
     return x, e, t
+
 
 def probe_infnan(v, name, extras={}):
     nps = torch.isnan(v)
     s = nps.sum().item()
     if s > 0:
-        print('>>> {} >>>'.format(name))
+        print(">>> {} >>>".format(name))
         print(name, s)
         print(v[nps])
         for k, val in extras.items():
@@ -148,17 +163,18 @@ class Identity(nn.Module):
             return args[0]
         return args
 
+
 def get_batcnnorm(bn, nr_features=None, nr_dims=1):
     if isinstance(bn, nn.Module):
         return bn
 
     assert 1 <= nr_dims <= 3
 
-    if bn in (True, 'async'):
-        clz_name = 'BatchNorm{}d'.format(nr_dims)
+    if bn in (True, "async"):
+        clz_name = "BatchNorm{}d".format(nr_dims)
         return getattr(nn, clz_name)(nr_features)
     else:
-        raise ValueError('Unknown type of batch normalization: {}.'.format(bn))
+        raise ValueError("Unknown type of batch normalization: {}.".format(bn))
 
 
 def get_dropout(dropout, nr_dims=1):
@@ -170,7 +186,7 @@ def get_dropout(dropout, nr_dims=1):
     if nr_dims == 1:
         return nn.Dropout(dropout, True)
     else:
-        clz_name = 'Dropout{}d'.format(nr_dims)
+        clz_name = "Dropout{}d".format(nr_dims)
         return getattr(nn, clz_name)(dropout)
 
 
@@ -178,23 +194,23 @@ def get_activation(act):
     if isinstance(act, nn.Module):
         return act
 
-    assert type(act) is str, 'Unknown type of activation: {}.'.format(act)
+    assert type(act) is str, "Unknown type of activation: {}.".format(act)
     act_lower = act.lower()
-    if act_lower == 'identity':
+    if act_lower == "identity":
         return Identity()
-    elif act_lower == 'relu':
+    elif act_lower == "relu":
         return nn.ReLU(True)
-    elif act_lower == 'selu':
+    elif act_lower == "selu":
         return nn.SELU(True)
-    elif act_lower == 'sigmoid':
+    elif act_lower == "sigmoid":
         return nn.Sigmoid()
-    elif act_lower == 'tanh':
+    elif act_lower == "tanh":
         return nn.Tanh()
     else:
         try:
             return getattr(nn, act)
         except AttributeError:
-            raise ValueError('Unknown activation function: {}.'.format(act))
+            raise ValueError("Unknown activation function: {}.".format(act))
 
 
 def get_optimizer(optimizer, model, *args, **kwargs):
@@ -205,18 +221,20 @@ def get_optimizer(optimizer, model, *args, **kwargs):
         try:
             optimizer = getattr(optim, optimizer)
         except AttributeError:
-            raise ValueError('Unknown optimizer type: {}.'.format(optimizer))
-    return optimizer(filter(lambda p: p.requires_grad, model.parameters()), *args, **kwargs)
-    
+            raise ValueError("Unknown optimizer type: {}.".format(optimizer))
+    return optimizer(
+        filter(lambda p: p.requires_grad, model.parameters()), *args, **kwargs
+    )
+
 
 def stmap(func, iterable):
     if isinstance(iterable, six.string_types):
         return func(iterable)
-    elif isinstance(iterable, (collections.Sequence, collections.UserList)):
+    elif isinstance(iterable, (collections.abc.Sequence, collections.UserList)):
         return [stmap(func, v) for v in iterable]
-    elif isinstance(iterable, collections.Set):
+    elif isinstance(iterable, collections.abc.Set):
         return {stmap(func, v) for v in iterable}
-    elif isinstance(iterable, (collections.Mapping, collections.UserDict)):
+    elif isinstance(iterable, (collections.abc.Mapping, collections.UserDict)):
         return {k: stmap(func, v) for k, v in iterable.items()}
     else:
         return func(iterable)
@@ -224,6 +242,7 @@ def stmap(func, iterable):
 
 def _as_tensor(o):
     from torch.autograd import Variable
+
     if isinstance(o, SKIP_TYPES):
         return o
     if isinstance(o, Variable):
@@ -239,6 +258,7 @@ def as_tensor(obj):
 
 def _as_numpy(o):
     from torch.autograd import Variable
+
     if isinstance(o, SKIP_TYPES):
         return o
     if isinstance(o, Variable):
@@ -268,6 +288,7 @@ def as_float(obj):
 
 def _as_cpu(o):
     from torch.autograd import Variable
+
     if isinstance(o, Variable) or torch.is_tensor(o):
         return o.cpu()
     return o
@@ -287,31 +308,28 @@ from scipy.stats import norm
 def create_twomoon_dataset(n, p):
     relevant, y = make_moons(n_samples=n, shuffle=True, noise=0.1, random_state=None)
     print(y.shape)
-    noise_vector = norm.rvs(loc=0, scale=1, size=[n,p-2])
+    noise_vector = norm.rvs(loc=0, scale=1, size=[n, p - 2])
     data = np.concatenate([relevant, noise_vector], axis=1)
     print(data.shape)
     return data, y
 
 
-def create_sin_dataset(n,p):
-    x1=5*(np.random.uniform(0,1,n)).reshape(-1,1)
-    x2=5*(np.random.uniform(0,1,n)).reshape(-1,1)
-    y=np.sin(x1)*np.cos(x2)**3
-    relevant=np.hstack((x1,x2))
-    noise_vector = norm.rvs(loc=0, scale=1, size=[n,p-2])
+def create_sin_dataset(n, p):
+    x1 = 5 * (np.random.uniform(0, 1, n)).reshape(-1, 1)
+    x2 = 5 * (np.random.uniform(0, 1, n)).reshape(-1, 1)
+    y = np.sin(x1) * np.cos(x2) ** 3
+    relevant = np.hstack((x1, x2))
+    noise_vector = norm.rvs(loc=0, scale=1, size=[n, p - 2])
     data = np.concatenate([relevant, noise_vector], axis=1)
     return data, y.astype(np.float32)
 
 
-
 def create_simple_sin_dataset(n, p):
-    '''This dataset was added to provide an example of L1 norm reg failure for presentation.
-    '''
+    """This dataset was added to provide an example of L1 norm reg failure for presentation."""
     assert p == 2
-    x1 = np.random.uniform(-math.pi, math.pi, n).reshape(n ,1)
+    x1 = np.random.uniform(-math.pi, math.pi, n).reshape(n, 1)
     x2 = np.random.uniform(-math.pi, math.pi, n).reshape(n, 1)
     y = np.sin(x1)
     data = np.concatenate([x1, x2], axis=1)
     print("data.shape: {}".format(data.shape))
     return data, y
-    
